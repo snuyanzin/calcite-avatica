@@ -188,6 +188,163 @@ public class DateTimeUtilsTest {
     assertEquals(-25508, ymdToUnixDate(1900, 3, 1));
   }
 
+  @Test public void testUnixFormattedStringToUnixDate() {
+    System.out.println(DateTimeUtils.formattedStringToUnixDate("12 23:12:21", "MM HH24"));
+  }
+
+  @Test public void testUnixDateTimeToFormattedString() {
+    assertThat(
+        DateTimeUtils.unixDateTimeToFormattedString(
+            DateTimeUtils.timestampStringToUnixDate("2007-04-30"), "Y"), is("7"));
+    assertThat(
+        DateTimeUtils.unixDateTimeToFormattedString(
+            DateTimeUtils.timestampStringToUnixDate("1500-04-30"), "YY"), is("00"));
+    assertThat(
+        DateTimeUtils.unixDateTimeToFormattedString(
+            DateTimeUtils.timestampStringToUnixDate("1900-04-30"), "YYY"), is("900"));
+    assertThat(
+        DateTimeUtils.unixDateTimeToFormattedString(
+            DateTimeUtils.timestampStringToUnixDate("300-04-30"), "YYYY"), is("0300"));
+    assertThat(
+        DateTimeUtils.unixDateTimeToFormattedString(
+            DateTimeUtils.timestampStringToUnixDate("2018-04-30"), "Y,YYY"), is("2,018"));
+
+    assertThat(
+        DateTimeUtils.unixDateTimeToFormattedString(
+            DateTimeUtils.timestampStringToUnixDate("2005-01-01"), "I"), is("4"));
+    assertThat(
+        DateTimeUtils.unixDateTimeToFormattedString(
+            DateTimeUtils.timestampStringToUnixDate("2003-01-01"), "IY"), is("03"));
+    assertThat(
+        DateTimeUtils.unixDateTimeToFormattedString(
+            DateTimeUtils.timestampStringToUnixDate("2010-01-03"), "IYY"), is("009"));
+    assertThat(
+        DateTimeUtils.unixDateTimeToFormattedString(
+            DateTimeUtils.timestampStringToUnixDate("2012-12-31"), "IYYY"), is("2013"));
+
+    assertThat(
+        DateTimeUtils.unixDateTimeToFormattedString(
+            DateTimeUtils.timestampStringToUnixDate("1969-12-31"), "D/DD/DDD,ID/IDDD J"),
+            is("4/31/365,3/3 2440587"));
+    assertThat(
+        DateTimeUtils.unixDateTimeToFormattedString(
+            DateTimeUtils.timestampStringToUnixDate("2012-12-31"), "D/DD/DDD,ID/IDDD J"),
+            is("2/31/366,1/1 2456293"));
+
+    assertThat(
+        DateTimeUtils.unixDateTimeToFormattedString(
+            DateTimeUtils.timestampStringToUnixDate("1969-12-31"), "MM/RM"), is("12/XII"));
+    assertThat(
+        DateTimeUtils.unixDateTimeToFormattedString(
+            DateTimeUtils.timestampStringToUnixDate("1970-08-01"), "MM/rm"), is("08/viii"));
+
+    assertThat(
+        DateTimeUtils.unixDateTimeToFormattedString(
+            DateTimeUtils.timestampStringToUnixDate("2000-08-01"), "CC-Q"), is("20-3"));
+    assertThat(
+        DateTimeUtils.unixDateTimeToFormattedString(
+            DateTimeUtils.timestampStringToUnixDate("2001-01-01"), "Q:CC"), is("1:21"));
+
+    assertThat(
+        DateTimeUtils.unixDateTimeToFormattedString(
+            DateTimeUtils.timestampStringToUnixDate("1969-12-31"), "W/WW/IW"), is("5/52/1"));
+
+    assertThat(
+        DateTimeUtils.unixDateTimeToFormattedString(
+            DateTimeUtils.timestampStringToUnixDate("2018-01-10 01:45:57"), "HH:MI:SS.MS am"),
+            is("1:45:57.000 am"));
+    assertThat(
+        DateTimeUtils.unixDateTimeToFormattedString(
+            DateTimeUtils.timestampStringToUnixDate("2018-01-10 23:45:57"),
+                "HH24,HH12:MI:SS/MS;am a.m.AM"), is("23,11:45:57/000;pm p.m.PM"));
+
+    // PostgreSQL style
+    assertThat(
+        DateTimeUtils.unixDateTimeToFormattedString(
+            DateTimeUtils.timestampStringToUnixDate("2018-01-10 23:45:57"), "SSSS"), is("85557"));
+    // Oracle style
+    assertThat(
+        DateTimeUtils.unixDateTimeToFormattedString(
+            DateTimeUtils.timestampStringToUnixDate("2018-01-10 23:45:57"), "SSSSS"), is("85557"));
+
+    assertThat(
+        DateTimeUtils.unixDateTimeToFormattedString(
+            DateTimeUtils.timestampStringToUnixDate("1969-12-31 22:32:12"),
+                "\"The last digit of year\" : Y; "
+                + "\"last 2 digits of year\" : YY; "
+                + "\"last 3 digits of year\" : YYY; "
+                + "\"year in 4 digits\" : YYYY; "
+                + "\"year in 4 digits with comma\" : Y,YYY "
+                + "\"Last digit of ISO 8601 week-numbering year\" : I "
+                + "\"Last 2 digits of ISO 8601 week-numbering year\" : IY "
+                + "\"Last 3 digits of ISO 8601 week-numbering year\" : IYY "
+                + "\"ISO 8601 week-numbering year (4 or more digits)\" : IYYY "
+                + "\"month number from 01 to 12\" : MM "
+                + "\"Day of year (1-366)\" : DDD "
+                + "\"Day of ISO 8601 week-numbering year (1-371; "
+                + "day 1 of the year is Monday of the first ISO week)\" : IDDD "
+                + "\"Day of month (1-31)\" : DD "
+                + "\"Day of the week, Sunday (1) to Saturday (7)\" : D "
+                + "\"ISO 8601 day of the week, Monday (1) to Sunday (7)\" : ID "
+                + "\"Week of month (1-5) (the first week starts on"
+                + " the first day of the month)\" : W "
+                + "\"Week number of year (1-53) (the first week starts on "
+                + "the first day of the year)\" : WW "
+                + "\"Week number of ISO 8601 week-numbering year "
+                + "(01-53; the first Thursday of the year is in week 1)\" : IW "
+                + "\"Century e.g, 21, 22, etc.\" : CC "
+                + "\"Julian Day (integer days since November 24, 4714 BC "
+                + "at midnight UTC)\" : J "
+                + "\"Month in upper case Roman numerals (I-XII)\" : RM "
+                + "\"Month in lowercase Roman numerals (i-xii)\" : rm "
+                + "\"Hour of day (0-12)\" : HH "
+                + "\"Hour of day (0-12)\" : HH12 "
+                + "\"Hour of day (0-23)\" : HH24 "
+                + "\"Minute (0-59)\" : MI "
+                + "\"Second (0-59)\" : SS "
+                + "\"Millisecond (000-9999)\" : MS "
+                + "\"Seconds past midnight (0-86399) (PostgreSQL)\" : SSSS "
+                + "\"Seconds past midnight (0-86399) (Oracle)\" : SSSSS "
+                + "\"Meridiem indicator (without periods)\" : AM am "
+                + "\"Meridiem indicator (with periods)\" : A.M. a.m. "),
+            is("The last digit of year : 9; "
+                + "last 2 digits of year : 69; "
+                + "last 3 digits of year : 969; "
+                + "year in 4 digits : 1969; "
+                + "year in 4 digits with comma : 1,969 "
+                + "Last digit of ISO 8601 week-numbering year : 0 "
+                + "Last 2 digits of ISO 8601 week-numbering year : 70 "
+                + "Last 3 digits of ISO 8601 week-numbering year : 970 "
+                + "ISO 8601 week-numbering year (4 or more digits) : 1970 "
+                + "month number from 01 to 12 : 12 "
+                + "Day of year (1-366) : 365 "
+                + "Day of ISO 8601 week-numbering year (1-371; "
+                + "day 1 of the year is Monday of the first ISO week) : 3 "
+                + "Day of month (1-31) : 31 "
+                + "Day of the week, Sunday (1) to Saturday (7) : 4 "
+                + "ISO 8601 day of the week, Monday (1) to Sunday (7) : 3 "
+                + "Week of month (1-5) (the first week starts "
+                + "on the first day of the month) : 5 "
+                + "Week number of year (1-53) (the first week starts on the"
+                + " first day of the year) : 52 "
+                + "Week number of ISO 8601 week-numbering year (01-53; "
+                + "the first Thursday of the year is in week 1) : 1 "
+                + "Century e.g, 21, 22, etc. : 20 "
+                + "Julian Day (integer days since November 24, 4714 BC at midnight UTC) : 2440587 "
+                + "Month in upper case Roman numerals (I-XII) : XII "
+                + "Month in lowercase Roman numerals (i-xii) : xii "
+                + "Hour of day (0-12) : 10 "
+                + "Hour of day (0-12) : 10 "
+                + "Hour of day (0-23) : 22 "
+                + "Minute (0-59) : 32 "
+                + "Second (0-59) : 12 "
+                + "Millisecond (000-9999) : 000 "
+                + "Seconds past midnight (0-86399) (PostgreSQL) : 81132 "
+                + "Seconds past midnight (0-86399) (Oracle) : 81132 "
+                + "Meridiem indicator (without periods) : PM pm "
+                + "Meridiem indicator (with periods) : P.M. p.m. "));
+  }
+
   @Test public void testDateToString() {
     checkDateString("1970-01-01", 0);
     //noinspection PointlessArithmeticExpression

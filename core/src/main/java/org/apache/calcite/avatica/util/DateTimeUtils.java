@@ -353,6 +353,12 @@ public class DateTimeUtils {
     buf.append((char) ('0' + i % 10));
   }
 
+  private static void int3(StringBuilder buf, int i) {
+    buf.append((char) ('0' + (i / 100) % 10));
+    buf.append((char) ('0' + (i / 10) % 10));
+    buf.append((char) ('0' + i % 10));
+  }
+
   private static void int4(StringBuilder buf, int i) {
     buf.append((char) ('0' + (i / 1000) % 10));
     buf.append((char) ('0' + (i / 100) % 10));
@@ -513,6 +519,8 @@ public class DateTimeUtils {
       h = v % 24;
       v /= 24;
       d = v;
+      ms = Long.MIN_VALUE;
+      s = Long.MIN_VALUE;
       buf.append((int) d);
       buf.append(' ');
       number(buf, (int) h, 2);
@@ -527,6 +535,9 @@ public class DateTimeUtils {
       h = v % 24;
       v /= 24;
       d = v;
+      ms = Long.MIN_VALUE;
+      s = Long.MIN_VALUE;
+      m = Long.MIN_VALUE;
       buf.append((int) d);
       buf.append(' ');
       number(buf, (int) h, 2);
@@ -534,6 +545,10 @@ public class DateTimeUtils {
     case DAY:
       v = roundUp(v, 1000 * 60 * 60 * 24);
       d = v / (1000 * 60 * 60 * 24);
+      ms = Long.MIN_VALUE;
+      s = Long.MIN_VALUE;
+      m = Long.MIN_VALUE;
+      h = Long.MIN_VALUE;
       buf.append((int) d);
       break;
     case HOUR:
@@ -542,6 +557,10 @@ public class DateTimeUtils {
       v /= 60;
       v /= 60;
       h = v;
+      ms = Long.MIN_VALUE;
+      s = Long.MIN_VALUE;
+      m = Long.MIN_VALUE;
+      d = Long.MIN_VALUE;
       buf.append((int) h);
       break;
     case HOUR_TO_MINUTE:
@@ -551,6 +570,9 @@ public class DateTimeUtils {
       m = v % 60;
       v /= 60;
       h = v;
+      ms = Long.MIN_VALUE;
+      s = Long.MIN_VALUE;
+      d = Long.MIN_VALUE;
       buf.append((int) h);
       buf.append(':');
       number(buf, (int) m, 2);
@@ -564,6 +586,7 @@ public class DateTimeUtils {
       m = v % 60;
       v /= 60;
       h = v;
+      d = Long.MIN_VALUE;
       buf.append((int) h);
       buf.append(':');
       number(buf, (int) m, 2);
@@ -578,6 +601,8 @@ public class DateTimeUtils {
       s = v % 60;
       v /= 60;
       m = v;
+      d = Long.MIN_VALUE;
+      h = Long.MIN_VALUE;
       buf.append((int) m);
       buf.append(':');
       number(buf, (int) s, 2);
@@ -588,6 +613,10 @@ public class DateTimeUtils {
       v /= 1000;
       v /= 60;
       m = v;
+      ms = Long.MIN_VALUE;
+      s = Long.MIN_VALUE;
+      d = Long.MIN_VALUE;
+      h = Long.MIN_VALUE;
       buf.append((int) m);
       break;
     case SECOND:
@@ -595,6 +624,9 @@ public class DateTimeUtils {
       ms = v % 1000;
       v /= 1000;
       s = v;
+      d = Long.MIN_VALUE;
+      m = Long.MIN_VALUE;
+      h = Long.MIN_VALUE;
       buf.append((int) s);
       fraction(buf, scale, ms);
       break;
@@ -841,6 +873,22 @@ public class DateTimeUtils {
     return (int) (julian - fmofw) / 7 + 1;
   }
 
+  /** Returns the ISO-8601 year number based on year, month, iso8601 week number. */
+  private static int getIso8601Year(int year, int month, int iso8601WeekNumber) {
+    int isoYear = year;
+    if (iso8601WeekNumber == 1 && month == 12) {
+      ++isoYear;
+    } else if (month == 1 && iso8601WeekNumber > 50) {
+      --isoYear;
+    }
+    return isoYear;
+  }
+
+  /** Returns year's week number (1-53). */
+  private static int getWeekOfYear(int julian, int year) {
+    return ((julian - ymdToJulian(year, 1, 1)) + 1) / 7;
+  }
+
   /** Extracts a time unit from a UNIX date (milliseconds since epoch). */
   public static int unixTimestampExtract(TimeUnitRange range,
       long timestamp) {
@@ -1078,6 +1126,535 @@ public class DateTimeUtils {
   /** Returns the value of a {@code OffsetDateTime} as a string. */
   public static String offsetDateTimeValue(Object o) {
     return OFFSET_DATE_TIME_HANDLER.stringValue(o);
+  }
+
+  public static long formattedStringToUnixDate(String timestamp, String pattern) {
+    int length = pattern.length();
+    int timestampPosition = 0;
+    long resultTimestamp = 0;
+    for (int position = 0; position < length; position++) {
+      int endPosition = getTokenEndPosition(pattern, position);
+      int tokenLen = endPosition - position + 1;
+      if (tokenLen <= 0) {
+        break;
+      }
+      char c = pattern.charAt(position);
+      int oldStartPosition = position;
+      position += tokenLen - 1;
+      switch (c) {
+      case 'M':
+        switch (tokenLen) {
+        case 1:
+          if (lookAhead(pattern, position, 'I')) {
+            // 'MI': Minute (0-59).
+            int minute =
+                Integer.valueOf(timestamp.substring(timestampPosition, timestampPosition + 2));
+            if (minute < 0 || minute > 59) {
+              throw new IllegalArgumentException("");
+            }
+            resultTimestamp += minute * MILLIS_PER_MINUTE;
+          } else if (lookAhead(pattern, position, 'S')) {
+            // 'MS': Millisecond (000-9999).
+            int millis =
+                Integer.valueOf(timestamp.substring(timestampPosition, timestampPosition + 3));
+            if (millis < 0 || millis > 9999) {
+              throw new IllegalArgumentException("");
+            }
+            resultTimestamp += millis;
+          } else {
+            throw new IllegalArgumentException("Illegal pattern component: " + c);
+          }
+          position++;
+          break;
+          // 'MM': Month (01-12; January = 01).
+        case 2:
+          int month =
+              Integer.valueOf(timestamp.substring(timestampPosition, timestampPosition + 2));
+          if (month > 12 || month < 0) {
+            throw new IllegalArgumentException("MM should be between 1 and 12");
+          }
+          resultTimestamp +=
+              Integer.valueOf(timestamp.substring(timestampPosition, timestampPosition + 2))
+                  * MILLIS_PER_HOUR ;
+          timestampPosition += 2;
+          position += 2;
+          break;
+        default:
+     //     int2(result, month);
+          position = position - (tokenLen - 2);
+        }
+        break;
+      case 'H':
+        switch (tokenLen) {
+        case 1:
+          System.out.println(timestampPosition + " " + pattern.substring(timestampPosition));
+          throw new IllegalArgumentException("Illegal pattern component: " + c);
+        case 2:
+          if (pattern.regionMatches(position + 1, "24", 0, "24".length())) {
+            // 'HH24': Hour of day (0-23).
+            int hh24 =
+                Integer.valueOf(timestamp.substring(timestampPosition, timestampPosition + 2));
+            if (hh24 > 23 || hh24 < 0) {
+              throw new IllegalArgumentException("HH24 should be between 0 and 23");
+            }
+            resultTimestamp +=
+                Integer.valueOf(timestamp.substring(timestampPosition, timestampPosition + 2))
+                    * MILLIS_PER_HOUR;
+            timestampPosition += 2;
+            position += 2;
+          } else if (pattern.regionMatches(position + 1, "12", 0, "12".length())) {
+            // 'HH12': Hour of day (1-12).
+            int hh12 =
+                Integer.valueOf(timestamp.substring(timestampPosition, timestampPosition + 2));
+            if (hh12 > 12 || hh12 < 1) {
+              throw new IllegalArgumentException("HH24 should be between 0 and 12");
+            }
+            resultTimestamp +=
+                Integer.valueOf(timestamp.substring(timestampPosition, timestampPosition + 2))
+                    * MILLIS_PER_HOUR;
+            timestampPosition += 2;
+            position += 2;
+          } else {
+            // 'HH': Hour of day (1-12).
+            resultTimestamp +=
+                Integer.valueOf(timestamp.substring(timestampPosition, timestampPosition + 2))
+                    * MILLIS_PER_HOUR;
+            timestampPosition += 2;
+          }
+          break;
+        default:
+        }
+        break;
+      default:
+        System.out.println(timestamp.substring(timestampPosition));
+      }
+    }
+    System.out.println("before");
+    return resultTimestamp;
+  }
+
+  public static String unixDateTimeToFormattedString(long timestamp, String pattern) {
+    int length = pattern.length();
+    StringBuilder result = new StringBuilder();
+    int date = (int) (timestamp / MILLIS_PER_DAY);
+    int time = (int) (timestamp % MILLIS_PER_DAY);
+    if (time < 0) {
+      --date;
+      time += MILLIS_PER_DAY;
+    }
+    int julian = date + EPOCH_JULIAN;
+    int year = (int) DateTimeUtils.unixDateExtract(TimeUnitRange.YEAR, date);
+    int month = (int) DateTimeUtils.unixDateExtract(TimeUnitRange.MONTH, date);
+    int day = (int) DateTimeUtils.unixDateExtract(TimeUnitRange.DAY, date);
+    int hour = DateTimeUtils.unixTimeExtract(TimeUnitRange.HOUR, time);
+    int minute = DateTimeUtils.unixTimeExtract(TimeUnitRange.MINUTE, time);
+    int second = DateTimeUtils.unixTimeExtract(TimeUnitRange.SECOND, time);
+
+    for (int position = 0; position < length; position++) {
+      int endPosition = getTokenEndPosition(pattern, position);
+      int tokenLen = endPosition - position + 1;
+      if (tokenLen <= 0) {
+        break;
+      }
+      char c = pattern.charAt(position);
+      int oldStartPosition = position;
+      position += tokenLen - 1;
+      boolean isUpperCase = false;
+      switch (c) {
+      // Meridian indicator with or without periods.
+      case 'A': // 'AM', 'A.M.', 'AD', 'A.D.'
+      case 'B': // 'BC', 'B.C.'
+      case 'P': // 'PM', 'P.M.'
+        isUpperCase = true;
+      //fall through
+      case 'a': // 'am', 'a.m.', 'ad', 'a.d.'
+      case 'b': // 'pm', 'p.m.'
+      case 'p': // 'pm', 'p.m.'
+        if ((c == 'b' || c == 'B')
+            && (pattern.regionMatches(true, position + 1, ".c.", 0, ".c.".length()))) {
+          result
+              .append(year > 0 ? isUpperCase ? "A.D." : "a.d." : isUpperCase ? "B.C." : "b.c.");
+          position += 3;
+        } else if (pattern.regionMatches(true, position + 1, ".m.", 0, ".m.".length())) {
+          result
+              .append(hour > 11 ? isUpperCase ? "P.M." : "p.m." : isUpperCase ? "A.M." : "a.m.");
+          position += 3;
+        } else if (pattern.regionMatches(true, position + 1, ".d.", 0, ".d.".length())) {
+          result
+              .append(year > 0 ? isUpperCase ? "A.D." : "a.d." : isUpperCase ? "B.C." : "b.c.");
+          position += 3;
+        } else if (pattern.regionMatches(true, position + 1, "m", 0, "m".length())) {
+          result.append(hour > 11 ? isUpperCase ? "PM" : "pm" : isUpperCase ? "AM" : "am");
+          position++;
+        } else if (pattern.regionMatches(true, position + 1, "d", 0, "d".length())
+            || pattern.regionMatches(true, position + 1, "c", 0, "c".length())) {
+          result.append(year > 0 ? isUpperCase ? "AD" : "ad" : isUpperCase ? "BC" : "bc");
+          position++;
+        } else {
+          throw new IllegalArgumentException(
+              "Illegal pattern component: " + c + " at " + position);
+        }
+        break;
+      case 'Y': // year designator (text)
+        switch (tokenLen) {
+        case 1:
+          // 'Y,YYY': Year with comma in this position. E.g.: 2,018.
+          if (pattern.regionMatches(position + 1, ",YYY", 0, ",YYY".length())) {
+            result.append(year / 1000).append(',');
+            int3(result, year);
+            position += 4;
+          } else { // 'Y': Last 1 digit of year.
+            result.append(year % 10);
+          }
+          break;
+        case 2: // 'YY': Last 2 digits of year.
+          int2(result, year);
+          break;
+        case 3: // 'YYY': Last 3 digits of year.
+          int3(result, year);
+          break;
+        case 4: // 'YYYY': 4 digits of year.
+          int4(result, year);
+          break;
+        default:
+          result.append(year);
+          position = position - (tokenLen - 4);
+        }
+        break;
+      case 'D': // day designator (text)
+        switch (tokenLen) {
+        // 'D': Day of week (1-7) where sun=1, sat=7.
+        case 1:
+          result.append(DateTimeUtils.unixDateExtract(TimeUnitRange.DOW, date));
+          break;
+        // 'DD': Day of month (1-31).
+        case 2:
+          result.append(day);
+          break;
+        // 'DDD': Day of year (1-366).
+        case 3:
+          result.append(DateTimeUtils.unixDateExtract(TimeUnitRange.DOY, date));
+          break;
+        default:
+          result.append(DateTimeUtils.unixDateExtract(TimeUnitRange.DOY, date));
+          position = position - (tokenLen - 3);
+        }
+        break;
+      // month, minute, millisecond designator
+      case 'M':
+        switch (tokenLen) {
+        case 1:
+          if (lookAhead(pattern, position, 'I')) {
+            // 'MI': Minute (0-59).
+            result.append(minute);
+          } else if (lookAhead(pattern, position, 'S')) {
+            // 'MS': Millisecond (000-9999).
+            int3(result, time % 1000);
+          } else {
+            throw new IllegalArgumentException("Illegal pattern component: " + c);
+          }
+          position++;
+          break;
+        // 'MM': Month (01-12; January = 01).
+        case 2:
+          int2(result, month);
+          break;
+        default:
+          int2(result, month);
+          position = position - (tokenLen - 2);
+        }
+        break;
+      // second designator
+      case 'S':
+        switch (tokenLen) {
+        case 1:
+          throw new IllegalArgumentException("Illegal pattern component: " + c);
+        // 'SS': Second (0-59).
+        case 2:
+          result.append(second);
+          break;
+        case 3:
+          // as S is not valid => 3 also not a right option
+          throw new IllegalArgumentException("Illegal pattern component: "
+              + pattern.substring(oldStartPosition, oldStartPosition + tokenLen));
+        // Seconds past midnight (0-86399).
+        case 4: // 'SSSS':  PostgreSQL case
+        case 5: // 'SSSSS': Oracle case
+          result.append(time / MILLIS_PER_SECOND);
+          break;
+        default:
+          result.append(time / MILLIS_PER_SECOND);
+          position = position - (tokenLen - 5);
+        }
+        break;
+      // 'Q': Quarter of year (1, 2, 3, 4; January - March = 1).
+      case 'Q':
+        for (int k = 0; k < tokenLen; k++) {
+          result.append(DateTimeUtils.unixDateExtract(TimeUnitRange.QUARTER, date));
+        }
+        break;
+      // 'CC': Century.
+      case 'C':
+        switch (tokenLen) {
+        case 1:
+          throw new IllegalArgumentException("Illegal pattern component: " + c);
+        case 2:
+          result.append(DateTimeUtils.unixDateExtract(TimeUnitRange.CENTURY, date));
+          break;
+        default:
+          result.append(DateTimeUtils.unixDateExtract(TimeUnitRange.CENTURY, date));
+          position = position - (tokenLen - 2);
+        }
+        break;
+      // Week designator
+      case 'W':
+        switch (tokenLen) {
+        // 'W': Week of month (1-5) where week 1 starts on
+        // the first day of the month and ends on the seventh.
+        case 1:
+          result.append(day / 7 + 1);
+          break;
+        // 'WW': Week of year (1-53) where week 1 starts on
+        // the first day of the year and continues to the seventh day of the year.
+        case 2:
+          result.append(getWeekOfYear(julian, year));
+          break;
+        default:
+          result.append(getWeekOfYear(julian, year));
+          position = position - (tokenLen - 2);
+        }
+        break;
+      // Hour designator
+      case 'H':
+        switch (tokenLen) {
+        case 1:
+          throw new IllegalArgumentException("Illegal pattern component: " + c);
+        case 2:
+          if (pattern.regionMatches(position + 1, "24", 0,"24".length())) {
+            // 'HH24': Hour of day (0-23).
+            result.append(hour);
+            position += 2;
+          } else if (pattern.regionMatches(position + 1, "12", 0, "12".length())) {
+            // 'HH12': Hour of day (1-12).
+            result.append(hour % 12);
+            position += 2;
+          } else {
+            // 'HH': Hour of day (1-12).
+            result.append(hour == 0 ? 12 : hour % 12);
+          }
+          break;
+        default:
+          result.append(hour == 0 ? 12 : hour % 12);
+          position = position - (tokenLen - 2);
+        }
+        break;
+      // '-', '/', ',', '.', ';', ':', ' ': Punctuation text is reproduced in the result.
+      case ':':
+      case '-':
+      case ',':
+      case '.':
+      case ';':
+      case '/':
+      case ' ':
+        result.append(pattern, oldStartPosition, oldStartPosition + tokenLen);
+        break;
+      // '"': Quoted text is reproduced in the result.
+      case '\"':
+        result.append(pattern, oldStartPosition + 1, oldStartPosition + tokenLen - 1);
+        break;
+      // 'J': Julian day; the number of days since January 1, 4712 BC.
+      // Number specified with J must be integers.
+      case 'J':
+        for (int k = 0; k < tokenLen; k++) {
+          result.append(julian);
+        }
+        break;
+      // 'RM': Roman numeral month (I-XII; January = I).
+      // 'rm': Roman numeral month (i-xii; January = i).
+      case 'R':
+        isUpperCase = true;
+        //fall through
+      case 'r':
+        switch (tokenLen) {
+        case 1:
+          if ((isUpperCase && lookAhead(pattern, position, 'M'))
+              || (!isUpperCase && lookAhead(pattern, position, 'm'))) {
+            String monthInRomean = getMonthInRoman(month);
+            result.append(isUpperCase ? monthInRomean.toUpperCase(Locale.ROOT) : monthInRomean);
+            position++;
+            break;
+          } else {
+            throw new IllegalArgumentException("Illegal pattern component: "
+                + c + pattern.charAt(oldStartPosition));
+          }
+        default:
+          throw new IllegalArgumentException("Illegal pattern component: "
+              + pattern.substring(oldStartPosition, oldStartPosition + tokenLen));
+        }
+        break;
+      // ISO specific designator
+      case 'I':
+        int iso8601WeekNumber = getIso8601WeekNumber(julian, year, month, day);
+        int iso8601Year = getIso8601Year(year, month, iso8601WeekNumber);
+        if (tokenLen == 1 && position + tokenLen < length) {
+          position++;
+          endPosition = getTokenEndPosition(pattern, position);
+          tokenLen = endPosition - position + 1;
+          if (tokenLen > 0) {
+            c = pattern.charAt(position);
+            oldStartPosition = position;
+            position += tokenLen - 1;
+            switch (c) {
+            case 'Y':
+              switch (tokenLen) {
+              // 'IY': Last 2 digits of ISO year.
+              case 1:
+                int2(result, iso8601Year % 100);
+                break;
+              // 'IYY': Last 3 digits of ISO year.
+              case 2:
+                int3(result, iso8601Year % 1000);
+                break;
+              // 'IYYY': 4 digits of ISO year.
+              case 3:
+                int4(result, iso8601Year);
+                break;
+              default:
+                result.append(iso8601Year);
+                position = position - (tokenLen - 3);
+              }
+              break;
+            case 'W':
+              switch (tokenLen) {
+              // 'IW': Week of year (1-52 or 1-53) based on the ISO standard.
+              case 1:
+                result.append(iso8601WeekNumber);
+                break;
+              default:
+                result.append(iso8601WeekNumber);
+                position = position - (tokenLen - 1);
+              }
+              break;
+            case 'D':
+              long isodow = DateTimeUtils.unixDateExtract(TimeUnitRange.ISODOW, date);
+              switch (tokenLen) {
+              // 'ID': ISO 8601 day of the week, Monday (1) to Sunday (7)
+              case 1:
+                result.append(isodow);
+                break;
+              case 2:
+                throw new IllegalArgumentException("Illegal pattern component: "
+                    + pattern.substring(oldStartPosition, oldStartPosition + tokenLen));
+              // 'IDDD': Day of ISO 8601 week-numbering year
+              // (001-371; day 1 of the year is Monday of the first ISO week)
+              case 3:
+                result.append((iso8601WeekNumber - 1) * 7 + isodow);
+                break;
+              default:
+                result.append(isodow);
+                position = position - (tokenLen - 3);
+              }
+              break;
+            default:
+              // 'I': Last digit of ISO year (each letter 'I' one digit repeat)
+              result.append(iso8601Year % 10);
+              position = oldStartPosition - 1;
+            }
+          } else {
+            // 'I': Last digit of ISO year (each letter 'I' one digit repeat)
+            result.append(iso8601Year % 10);
+            position--;
+          }
+        } else {
+        // 'I': Last digit of ISO year (each letter 'I' one digit repeat)
+          for (int k = 0; k < tokenLen; k++) {
+            result.append(iso8601Year % 10);
+          }
+        }
+        break;
+      default:
+        throw new IllegalArgumentException("Illegal pattern component: "
+            + pattern.substring(oldStartPosition, oldStartPosition + tokenLen));
+      }
+    }
+    return result.toString();
+  }
+
+  private static String getMonthInRoman(int month) {
+    switch (month) {
+    case 1:
+      return "i";
+    case 2:
+      return "ii";
+    case 3:
+      return "iii";
+    case 4:
+      return "iv";
+    case 5:
+      return "v";
+    case 6:
+      return "vi";
+    case 7:
+      return "vii";
+    case 8:
+      return "viii";
+    case 9:
+      return "ix";
+    case 10:
+      return "x";
+    case 11:
+      return "xi";
+    case 12:
+      return "xii";
+    default:
+      throw new AssertionError("Wrong month's number " + month);
+    }
+  }
+
+  private static boolean lookAhead(String pattern, int startPosition, char first) {
+    return startPosition + 1 < pattern.length()
+        && pattern.charAt(startPosition + 1) == first;
+  }
+
+  public static int getTokenEndPosition(String pattern, int indexRef) {
+    int i = indexRef;
+    int length = pattern.length();
+
+    char c = pattern.charAt(i);
+    if (c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z'
+            || c == ':' || c == '.' || c == ',' || c == ';' || c == '-' || c == '/' || c == ' ') {
+      // Scan a run of the same character
+      while (i + 1 < length) {
+        char peek = pattern.charAt(i + 1);
+        if (peek == c) {
+          i++;
+        } else {
+          break;
+        }
+      }
+    } else {
+      // This will identify token as text.
+      boolean inLiteral = false;
+
+      for (; i < length; i++) {
+        c = pattern.charAt(i);
+        if (c == '\"') {
+          if (i + 1 < length && pattern.charAt(i + 1) == '\"') {
+            // "" is treated as escaped "
+            i++;
+          } else {
+            inLiteral = !inLiteral;
+          }
+        } else if (!inLiteral
+                && ((c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z')
+                || c == ':' || c == '.' || c == ',' || c == ';'
+                || c == '-' || c == '/' || c == ' ')) {
+          i--;
+          break;
+        }
+      }
+    }
+    return i;
   }
 
   //~ Inner Classes ----------------------------------------------------------

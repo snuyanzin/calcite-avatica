@@ -24,6 +24,7 @@ import java.io.InputStream;
 import java.io.Reader;
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.math.RoundingMode;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -41,6 +42,7 @@ import java.sql.Time;
 import java.sql.Timestamp;
 import java.sql.Types;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.List;
 import java.util.Map;
@@ -109,7 +111,7 @@ public abstract class AbstractCursor implements Cursor {
     case Types.INTEGER:
       return new IntAccessor(getter);
     case Types.BIGINT:
-      return new LongAccessor(getter);
+      return new BigIntegerAccessor(getter);
     case Types.BOOLEAN:
       return new BooleanAccessor(getter);
     case Types.REAL:
@@ -321,6 +323,10 @@ public abstract class AbstractCursor implements Cursor {
 
     public long getLong() throws SQLException {
       throw cannotConvert("long");
+    }
+
+    public BigInteger getBigInteger() throws SQLException {
+      throw cannotConvert("BigInteger");
     }
 
     public float getFloat() throws SQLException {
@@ -683,6 +689,32 @@ public abstract class AbstractCursor implements Cursor {
       return number != null && number.doubleValue() != 0;
     }
   }
+
+  /**
+   * Accessor that assumes that the underlying value is a {@link BigDecimal};
+   * corresponds to {@link java.sql.Types#DECIMAL}.
+   */
+  private static class BigIntegerAccessor extends BigNumberAccessor {
+    private BigIntegerAccessor(Getter getter) {
+      super(getter);
+    }
+
+    @Override protected Number getNumber() throws SQLException {
+      return (Number) getObject();
+    }
+
+    public long getLong() throws SQLException {
+      return getObject() == null ? 0 : (Long) getObject();
+    }
+
+    public BigInteger getBigInteger() throws SQLException {
+      if (super.getObject() instanceof byte[]) {
+        return new BigInteger((byte[]) super.getObject());
+      }
+      return BigInteger.valueOf(getLong());
+    }
+  }
+
 
   /**
    * Accessor that assumes that the underlying value is a {@link BigDecimal};

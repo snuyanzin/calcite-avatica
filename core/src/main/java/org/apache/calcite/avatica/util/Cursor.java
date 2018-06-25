@@ -21,6 +21,7 @@ import org.apache.calcite.avatica.ColumnMetaData;
 import java.io.InputStream;
 import java.io.Reader;
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.net.URL;
 import java.sql.Array;
 import java.sql.Blob;
@@ -92,6 +93,8 @@ public interface Cursor extends AutoCloseable {
     int getInt() throws SQLException;
 
     long getLong() throws SQLException;
+
+    BigInteger getBigInteger() throws SQLException;
 
     float getFloat() throws SQLException;
 
