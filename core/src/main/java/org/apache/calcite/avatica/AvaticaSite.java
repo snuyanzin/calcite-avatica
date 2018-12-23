@@ -304,7 +304,11 @@ public class AvaticaSite {
     case Types.ARRAY:
       return accessor.getArray();
     case Types.BIGINT:
-      return accessor.getBigInteger();
+      final long aLong = accessor.getLong();
+      if (aLong == 0 && accessor.wasNull()) {
+        return null;
+      }
+      return aLong;
     case Types.BINARY:
     case Types.LONGVARBINARY:
     case Types.VARBINARY:
