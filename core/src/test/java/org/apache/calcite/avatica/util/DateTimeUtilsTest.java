@@ -189,7 +189,7 @@ public class DateTimeUtilsTest {
   }
 
   @Test public void testUnixFormattedStringToUnixDate() {
-    System.out.println(DateTimeUtils.formattedStringToUnixDate("12 23:12:21", "MM HH24"));
+    System.out.println("sdf " + DateTimeUtils.formattedStringToUnixDate("12 23:12:21", "MM HH24"));
   }
 
   @Test public void testUnixDateTimeToFormattedString() {

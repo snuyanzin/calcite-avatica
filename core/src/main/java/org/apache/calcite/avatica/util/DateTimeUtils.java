@@ -1132,13 +1132,17 @@ public class DateTimeUtils {
     int length = pattern.length();
     int timestampPosition = 0;
     long resultTimestamp = 0;
-    for (int position = 0; position < length; position++) {
+    for (int position = 1; position < length; position++) {
       int endPosition = getTokenEndPosition(pattern, position);
-      int tokenLen = endPosition - position + 1;
+      int tokenLen = endPosition - position;
+      System.out.println(
+          tokenLen + " for " + pattern + " position "
+              + position + " endPosition " + endPosition);
       if (tokenLen <= 0) {
         break;
       }
       char c = pattern.charAt(position);
+
       int oldStartPosition = position;
       position += tokenLen - 1;
       switch (c) {
@@ -1175,7 +1179,7 @@ public class DateTimeUtils {
           }
           resultTimestamp +=
               Integer.valueOf(timestamp.substring(timestampPosition, timestampPosition + 2))
-                  * MILLIS_PER_HOUR ;
+                  * MILLIS_PER_HOUR;
           timestampPosition += 2;
           position += 2;
           break;
@@ -1298,22 +1302,22 @@ public class DateTimeUtils {
       case 'Y': // year designator (text)
         switch (tokenLen) {
         case 1:
-          // 'Y,YYY': Year with comma in this position. E.g.: 2,018.
+          // 'Y,YYY': Year with a comma. E.g.: 2,018.
           if (pattern.regionMatches(position + 1, ",YYY", 0, ",YYY".length())) {
             result.append(year / 1000).append(',');
             int3(result, year);
             position += 4;
-          } else { // 'Y': Last 1 digit of year.
+          } else { // 'Y': Last 1 year's digit.
             result.append(year % 10);
           }
           break;
-        case 2: // 'YY': Last 2 digits of year.
+        case 2: // 'YY'  : Last 2 year's digits.
           int2(result, year);
           break;
-        case 3: // 'YYY': Last 3 digits of year.
+        case 3: // 'YYY' : Last 3 year's digits.
           int3(result, year);
           break;
-        case 4: // 'YYYY': 4 digits of year.
+        case 4: // 'YYYY': 4 year's digits.
           int4(result, year);
           break;
         default:
@@ -1430,7 +1434,7 @@ public class DateTimeUtils {
         case 1:
           throw new IllegalArgumentException("Illegal pattern component: " + c);
         case 2:
-          if (pattern.regionMatches(position + 1, "24", 0,"24".length())) {
+          if (pattern.regionMatches(position + 1, "24", 0, "24".length())) {
             // 'HH24': Hour of day (0-23).
             result.append(hour);
             position += 2;
@@ -1475,27 +1479,25 @@ public class DateTimeUtils {
         isUpperCase = true;
         //fall through
       case 'r':
-        switch (tokenLen) {
-        case 1:
-          if ((isUpperCase && lookAhead(pattern, position, 'M'))
-              || (!isUpperCase && lookAhead(pattern, position, 'm'))) {
-            String monthInRomean = getMonthInRoman(month);
-            result.append(isUpperCase ? monthInRomean.toUpperCase(Locale.ROOT) : monthInRomean);
-            position++;
-            break;
-          } else {
-            throw new IllegalArgumentException("Illegal pattern component: "
-                + c + pattern.charAt(oldStartPosition));
-          }
-        default:
+        if (pattern.length() <= position) {
           throw new IllegalArgumentException("Illegal pattern component: "
-              + pattern.substring(oldStartPosition, oldStartPosition + tokenLen));
+              + c + pattern.charAt(oldStartPosition));
+        }
+
+        if ((isUpperCase && pattern.charAt(position + 1) == 'M')
+            || (!isUpperCase && pattern.charAt(position + 1) == 'm')) {
+          final String monthInRoman = getMonthInRoman(month);
+          result.append(isUpperCase ? monthInRoman.toUpperCase(Locale.ROOT) : monthInRoman);
+          position++;
+        } else {
+          throw new IllegalArgumentException("Illegal pattern component: "
+              + c + pattern.charAt(oldStartPosition));
         }
         break;
       // ISO specific designator
       case 'I':
-        int iso8601WeekNumber = getIso8601WeekNumber(julian, year, month, day);
-        int iso8601Year = getIso8601Year(year, month, iso8601WeekNumber);
+        final int iso8601WeekNumber = getIso8601WeekNumber(julian, year, month, day);
+        final int iso8601Year = getIso8601Year(year, month, iso8601WeekNumber);
         if (tokenLen == 1 && position + tokenLen < length) {
           position++;
           endPosition = getTokenEndPosition(pattern, position);
@@ -1536,7 +1538,7 @@ public class DateTimeUtils {
               }
               break;
             case 'D':
-              long isodow = DateTimeUtils.unixDateExtract(TimeUnitRange.ISODOW, date);
+              final long isodow = DateTimeUtils.unixDateExtract(TimeUnitRange.ISODOW, date);
               switch (tokenLen) {
               // 'ID': ISO 8601 day of the week, Monday (1) to Sunday (7)
               case 1:
@@ -1616,7 +1618,7 @@ public class DateTimeUtils {
         && pattern.charAt(startPosition + 1) == first;
   }
 
-  public static int getTokenEndPosition(String pattern, int indexRef) {
+  private static int getTokenEndPosition(String pattern, int indexRef) {
     int i = indexRef;
     int length = pattern.length();
 
