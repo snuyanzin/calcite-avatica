@@ -71,8 +71,6 @@ dependencies {
         apiv("org.hsqldb:hsqldb")
         apiv("org.mockito:mockito-core", "mockito")
         apiv("org.mockito:mockito-inline", "mockito")
-        runtime("org.ajoberstar.grgit:grgit-gradle:4.1.1")
-        runtime("org.ajoberstar.grgit:grgit-core:4.1.1")
         apiv("org.ow2.asm:asm")
         apiv("org.ow2.asm:asm-all", "asm")
         apiv("org.ow2.asm:asm-analysis", "asm")
